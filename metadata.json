@@ -1,0 +1,6 @@
+{
+  "name": "Stride: Plant Protein Bars",
+  "description": "Five bold flavours of plant protein bar. Pressed, not baked.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

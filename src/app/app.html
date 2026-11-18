@@ -1,0 +1,446 @@
+<canvas #glCanvas id="gl"></canvas>
+
+<!-- Intro Layer -->
+@if (introVisible()) {
+  <div #introEl id="intro" [class.stamp-mode]="introStamp()" [class.hiding]="introHiding()">
+    <video
+      #introVideo
+      [src]="introVideoUrl"
+      [muted]="true"
+      playsinline
+      preload="auto"
+      (canplay)="onIntroCanPlay()"
+      (timeupdate)="onIntroTimeUpdate()"
+      (ended)="onIntroVideoEnd()"
+      (error)="onIntroVideoError()"
+    ></video>
+
+    <button id="skip" type="button" (click)="skipIntro()">Skip intro</button>
+
+    <div #introStampEl class="intro-stamp" aria-hidden="true">
+      <svg class="intro-stamp-mark" viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="18" fill="#1c1a1f" />
+        <path d="M8.5 24.5 L15.5 13 L19.5 19.2 L22.2 15.2 L27.5 24.5 Z" fill="#f0e8e0" />
+      </svg>
+      <span class="intro-stamp-word">STRIDE</span>
+    </div>
+  </div>
+}
+
+<!-- Fixed Nav -->
+<nav
+  #navEl
+  id="nav"
+  [class.entered]="navEntered()"
+  [class.light]="navTone() === 'light'"
+  [class.dark]="navTone() === 'dark'"
+  aria-label="Primary"
+>
+  <a class="nav-brand" href="#flavors" (click)="scrollToSection($event, 'flavors')">
+    <svg class="nav-mark" viewBox="0 0 36 36" aria-hidden="true">
+      <circle class="disc" cx="18" cy="18" r="18" />
+      <path class="mtn" d="M8.5 24.5 L15.5 13 L19.5 19.2 L22.2 15.2 L27.5 24.5 Z" />
+    </svg>
+    <span class="nav-word">STRIDE</span>
+  </a>
+
+  <div #navPillEl class="nav-pill">
+    <div #navHlEl class="nav-hl"></div>
+    @for (item of navItems; track item.id; let idx = $index) {
+      <a
+        #navLinkEl
+        class="nav-link"
+        [class.active]="activeNavIndex() === idx"
+        [href]="'#' + item.id"
+        (click)="scrollToSection($event, item.id)"
+      >
+        {{ item.label }}
+      </a>
+    }
+  </div>
+
+  <div class="nav-right">
+    <button
+      type="button"
+      class="nav-chip nav-off"
+      (click)="scrollToSection($event, 'range')"
+    >
+      % OFF
+    </button>
+
+    <button
+      #basketBtn
+      type="button"
+      class="nav-chip nav-basket"
+      aria-label="Shopping basket"
+      [attr.aria-expanded]="cartOpen()"
+      (click)="toggleCart()"
+    >
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 8h12l-1.2 12H7.2L6 8z" />
+        <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+      </svg>
+      @if (cartCount() > 0) {
+        <span #badgeEl class="cart-badge">{{ cartCount() }}</span>
+      }
+    </button>
+
+    <button
+      type="button"
+      class="nav-dibs"
+      (click)="scrollToSection($event, 'shop')"
+    >
+      First dibs
+    </button>
+  </div>
+</nav>
+
+@if (cartOpen()) {
+  <div class="cart-pop" role="dialog" aria-label="Shopping basket summary">
+    <div class="flex items-center justify-between mb-3">
+      <span class="font-bold text-sm tracking-tight">Your Basket ({{ cartCount() }})</span>
+      <button
+        type="button"
+        class="text-xs font-mono uppercase tracking-wider opacity-60 hover:opacity-100 cursor-pointer bg-transparent border-0 p-1"
+        (click)="cartOpen.set(false)"
+      >
+        Close
+      </button>
+    </div>
+    @if (cartItems().length === 0) {
+      <p class="text-xs opacity-65 m-0">Your basket is empty. Pick a bar below or build a 3-pack.</p>
+    } @else {
+      <div class="flex flex-col gap-2 max-h-48 overflow-y-auto mb-3">
+        @for (ci of cartItems(); track ci.id) {
+          <div class="flex items-center justify-between text-xs py-1.5 border-b border-black/10">
+            <span class="font-medium">{{ ci.label }}</span>
+            <span class="font-mono opacity-75">{{ ci.price }}</span>
+          </div>
+        }
+      </div>
+      <div class="flex items-center justify-between pt-1">
+        <span class="text-xs font-mono uppercase opacity-70">Total</span>
+        <span class="text-sm font-mono font-medium">{{ cartTotalFormatted() }}</span>
+      </div>
+    }
+  </div>
+}
+
+<!-- Section 1: Hero Carousel -->
+<section #flavorsEl id="flavors">
+  <div #revealEl class="reveal"></div>
+  <div #ringsEl class="rings"></div>
+
+  <div class="bits">
+    @for (b of heroBits; track $index; let idx = $index) {
+      <div
+        #bitEl
+        class="spr bit"
+        [class.bit-hide-phone]="b.hidePhone"
+        [style.left.%]="b.xPct * 100"
+        [style.top.%]="b.yPct * 100"
+        [style.width]="bitWidthCss(b)"
+        [style.height]="bitHeightCss(b)"
+        [style.background-size]="bitSpriteStyle(b.bit).backgroundSize"
+        [style.background-position]="bitSpriteStyle(b.bit).backgroundPosition"
+        [style.transform]="'translate(-50%, -50%) rotate(' + b.rot + 'deg)'"
+      ></div>
+    }
+  </div>
+
+  <div
+    #arcEl
+    class="arc"
+    (pointerdown)="onArcPointerDown($event)"
+    (pointermove)="onArcPointerMove($event)"
+    (pointerup)="onArcPointerUp($event)"
+    (pointercancel)="onArcPointerCancel($event)"
+    (mousemove)="onArcMouseMove($event)"
+  ></div>
+
+  <button
+    #playBtn
+    id="play"
+    type="button"
+    aria-label="Next flavour"
+    (click)="stepFlavour(1)"
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1c1a1f" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="4" y1="12" x2="19" y2="12" />
+      <polyline points="13 6 19 12 13 18" />
+    </svg>
+  </button>
+
+  <h1 #titleEl id="title" class="disp" aria-live="polite">
+    <span class="title-layer">BERRY OAT</span>
+  </h1>
+
+  <div #countEl id="count" class="disp">02</div>
+
+  <button
+    #autoBtn
+    id="auto"
+    type="button"
+    [attr.aria-pressed]="autoplay()"
+    (click)="toggleAutoplay()"
+  >
+    <span class="auto-ring" aria-hidden="true">
+      @if (autoplay()) {
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="#fff">
+          <rect x="2" y="1.5" width="2.2" height="7" rx="1" />
+          <rect x="5.8" y="1.5" width="2.2" height="7" rx="1" />
+        </svg>
+      } @else {
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="#fff">
+          <polygon points="3,1.5 8.5,5 3,8.5" />
+        </svg>
+      }
+    </span>
+    <span class="auto-lbl">Autoplay</span>
+  </button>
+</section>
+
+<!-- Section 2: Inside (pinned) -->
+<section #insideEl id="inside">
+  <div class="pin">
+    <div #inDarkEl class="in-dark"></div>
+    <div #inBackFrame class="in-frame">
+      <div #inNumEl class="disp in-num">{{ insideNum() }}</div>
+      <div #inBarEl id="inBar"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Section 2 Front Layer (above canvas) -->
+<div #inFrontEl id="inFront">
+  <div class="storm">
+    @for (sp of stormPieces; track $index) {
+      <div
+        #stormEl
+        class="spr storm-piece"
+        [style.width.px]="stormPieceWidth(sp)"
+        [style.height.px]="stormPieceHeight(sp)"
+        [style.background-size]="stormSpriteStyle(sp).backgroundSize"
+        [style.background-position]="stormSpriteStyle(sp).backgroundPosition"
+      ></div>
+    }
+  </div>
+
+  <div #inFrontFrame class="in-frame">
+    <h2 #inHeadEl class="disp in-head">
+      @for (line of insideHeadLines(); track $index) {
+        <span [style.font-size]="line.small ? '0.72em' : null">{{ line.text }}</span>@if (!$last) {<br />}
+      }
+    </h2>
+
+    <div class="in-icons" role="tablist" aria-label="Inside steps">
+      <button
+        type="button"
+        class="in-icon"
+        [class.active]="insideStep() === 0"
+        aria-label="Step 01: Real food, first"
+        (click)="jumpToInsideStep(0)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+          <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        class="in-icon"
+        [class.active]="insideStep() === 1"
+        aria-label="Step 02: Pressed, not baked"
+        (click)="jumpToInsideStep(1)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <ellipse cx="8" cy="8" rx="3.2" ry="4.5" transform="rotate(-25 8 8)" />
+          <ellipse cx="16" cy="8" rx="3.2" ry="4.5" transform="rotate(25 16 8)" />
+          <ellipse cx="8" cy="16" rx="3.2" ry="4.5" transform="rotate(25 8 16)" />
+          <ellipse cx="16" cy="16" rx="3.2" ry="4.5" transform="rotate(-25 16 16)" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        class="in-icon"
+        [class.active]="insideStep() === 2"
+        aria-label="Step 03: Wrapped same day"
+        (click)="jumpToInsideStep(2)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 20.5s-7-4.5-7-10a4.2 4.2 0 0 1 7-3.1A4.2 4.2 0 0 1 19 10.5c0 5.5-7 10-7 10Z" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        class="in-icon"
+        [class.active]="insideStep() === 3"
+        aria-label="Step 04: Plant protein"
+        (click)="jumpToInsideStep(3)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="13 2 4 14 11.5 14 10.5 22 20 10 12.5 10 13 2" />
+        </svg>
+      </button>
+    </div>
+
+    <p #inCapEl class="in-cap">{{ insideCap() }}</p>
+  </div>
+</div>
+
+<!-- Section 3: Shop -->
+<section #shopEl id="shop">
+  <h2 class="disp shop-head">
+    <span class="reveal-line-wrap">
+      <span class="reveal-line" [class.in]="shopVisible()">GRAB</span>
+    </span>
+    <span class="reveal-line-wrap">
+      <span class="reveal-line" [class.in]="shopVisible()" style="transition-delay: 80ms">A BAG</span>
+    </span>
+  </h2>
+
+  <p class="shop-cap" [class.in]="shopVisible()">Five bold flavours. Same
+real ingredients. Pick your
+favourite (or try them all).</p>
+
+  <div #cardsEl id="cards" class="cards">
+    @for (flav of flavors; track flav.id; let idx = $index) {
+      <div
+        #cardEl
+        class="card"
+        [class.in]="shopVisible()"
+        [class.live]="activeFlavor() === idx"
+        [style.background]="flav.color"
+        [style.transition-delay]="shopVisible() ? (idx * 80) + 'ms' : '0ms'"
+        (mousemove)="onCardMouseMove($event, idx)"
+        (mouseleave)="onCardMouseLeave(idx)"
+        (pointerdown)="onCardPointerDown(idx)"
+        (pointerup)="onCardPointerUp(idx)"
+      >
+        <button
+          type="button"
+          class="card-poke"
+          [attr.aria-label]="'Squash ' + flav.name + ' bar'"
+          (click)="pokeCard(idx)"
+        ></button>
+
+        <h3 class="disp card-name">{{ flav.lines.join('\n') }}</h3>
+
+        <div
+          #pkEl
+          class="spr pk"
+          [style.background-size]="wrapperSpriteStyle(idx).backgroundSize"
+          [style.background-position]="wrapperSpriteStyle(idx).backgroundPosition"
+        ></div>
+
+        <button
+          type="button"
+          class="card-add"
+          [attr.aria-label]="'Add a bag of ' + flav.name + ' to the cart'"
+          (click)="addBagFromCard($event, idx)"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
+    }
+  </div>
+</section>
+
+<!-- Section 4: Build your 3 pack -->
+<section #rangeEl id="range">
+  <div class="range-left">
+    <h2 class="disp range-head">
+      <span class="reveal-line-wrap">
+        <span class="reveal-line" [class.in]="rangeHeadVisible()">BUILD YOUR</span>
+      </span>
+      <span class="reveal-line-wrap">
+        <span class="reveal-line" [class.in]="rangeHeadVisible()" style="transition-delay: 80ms">
+          <span class="box3">3</span> PACK &amp;
+        </span>
+      </span>
+      <span class="reveal-line-wrap">
+        <span class="reveal-line" [class.in]="rangeHeadVisible()" style="transition-delay: 160ms">SAVE $1.49</span>
+      </span>
+    </h2>
+
+    <div class="thumbs">
+      @for (flav of flavors; track flav.id; let idx = $index) {
+        <button
+          type="button"
+          class="thumb-btn"
+          [attr.aria-label]="'Add ' + flav.name + ' to pack'"
+          (click)="addToPack(idx)"
+        >
+          <div class="thumb-sq" [style.background]="flav.color">
+            <div
+              class="spr thumb-spr"
+              [style.background-size]="wrapperSpriteStyle(idx).backgroundSize"
+              [style.background-position]="wrapperSpriteStyle(idx).backgroundPosition"
+            ></div>
+          </div>
+          <span class="thumb-name">{{ flav.lines.join(' ') }}</span>
+          <span class="thumb-ring" [class.has]="packCounts()[idx] > 0">
+            @if (packCounts()[idx] === 1) {
+              ✓
+            } @else if (packCounts()[idx] > 1) {
+              {{ packCounts()[idx] }}
+            }
+          </span>
+        </button>
+      }
+    </div>
+
+    <button
+      #buyBtn
+      id="buy"
+      type="button"
+      [class.added]="packAddedState()"
+      [disabled]="!packAddedState() && packFilledCount() < 3"
+      (click)="buyPack()"
+    >
+      @if (packAddedState()) {
+        <span>Added to cart</span>
+      } @else if (packFilledCount() < 3) {
+        <span>Pick {{ 3 - packFilledCount() }} more</span>
+      } @else {
+        <span>Add to cart</span>
+        <span class="buy-price">$7.48</span>
+      }
+    </button>
+  </div>
+
+  <div #glowEl id="glow" [style.--g]="glowColor()">
+    @for (slotVal of packSlots(); track $index; let sIdx = $index) {
+      <div
+        class="slot"
+        [class.slot-0]="sIdx === 0"
+        [class.slot-1]="sIdx === 1"
+        [class.slot-2]="sIdx === 2"
+        [class.filled]="slotVal !== null"
+      >
+        @if (slotVal !== null) {
+          <div
+            #slotBarEl
+            class="spr slot-bar"
+            [style.background-size]="wrapperSpriteStyle(slotVal).backgroundSize"
+            [style.background-position]="wrapperSpriteStyle(slotVal).backgroundPosition"
+          ></div>
+        }
+        <button
+          type="button"
+          class="slot-x"
+          [attr.aria-label]="slotVal !== null ? 'Remove ' + flavors[slotVal].name + ' from slot ' + (sIdx + 1) : 'Empty slot ' + (sIdx + 1)"
+          (click)="removeFromPack(sIdx)"
+        >
+          ×
+        </button>
+      </div>
+    }
+  </div>
+</section>
